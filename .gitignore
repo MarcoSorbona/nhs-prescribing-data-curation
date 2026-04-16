@@ -1,15 +1,15 @@
-# R
-.Rproj.user
-.RData
-.Rhistory
+# Raw data (too large for GitHub)
+data/raw/
+data/lookup/
+data/clean/
+duckdb_temp/
 
-# Data (raw is messy but keep structure)
-data/raw/*.csv
-data/raw/*.xlsx
+# R files
+.Rproj.user/
+.Rhistory
+.RData
+.Ruserdata
 
 # Outputs
-*.pdf
-
-# OS files
-.DS_Store
-Thumbs.db
+*.parquet
+*.rds
