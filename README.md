@@ -43,7 +43,7 @@ nhs-prescribing-data-curation/
 ## 🛠️ Skills Demonstrated
 
 | Skill | Evidence |
-|------------------------------|------------------------------------------|
+|----|----|
 | **Large-scale data curation** | 1M+ rows/month, processed with `vroom`/`arrow` |
 | **Code versioning** | BNF/SNOMED changes across months |
 | **Lookup table joins** | Practice codes, BNF hierarchy, SNOMED mapping |
@@ -65,7 +65,7 @@ nhs-prescribing-data-curation/
 ### Known Data Complexities Handled
 
 | Challenge                         | Approach                                |
-|--------------------------------------|----------------------------------|
+|-----------------------------------|-----------------------------------------|
 | BNF/SNOMED codes change over time | Version-aware joins; documented         |
 | SSP utilisation not identifiable  | Explicit limitation in curation report  |
 | Negative quantities (returns)     | Flagged; exclusion rule documented      |
