@@ -93,8 +93,6 @@ if(length(months_with_missing) > 0) {
 }
 ```
 
-**Challenge**: The API endpoint for certain years returned zero `bnf_presentation_name` values.
-
 **Solution**: Documented limitation; flagged affected rows with `corruption_flag`; recommend excluding affected months for drug-level analysis.
 
 ```{r missing-table, echo=FALSE}

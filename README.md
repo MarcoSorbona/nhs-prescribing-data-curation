@@ -2,7 +2,7 @@
 
 English Prescribing Dataset (EPD) with SNOMED: data curation pipeline, quality assurance, and reproducible documentation for NHS primary care prescribing data.
 
-[**View the Interactive Dashboard →**](epd_dashboard.html) \| [**View the Curation Report →**](curation_report.html)
+[**View the Interactive Dashboard →**](epd_dashboard.html) \| [**View the Curation Report →**](docs/curation_report.html)
 
 ------------------------------------------------------------------------
 
@@ -35,14 +35,15 @@ A reproducible pipeline to fetch, clean, and document the English Prescribing Da
 ```         
 nhs-prescribing-data-curation/
 ├── README.md                    # This file
-├── curation_report.qmd          # Main curation documentation
+├── epd_dashboard.Rmd            # Interactive dashboard source
+├── epd_dashboard.html           # Rendered dashboard
 ├── data_dictionary.md           # Variable descriptions
 ├── R/
 │   ├── 01_curate_epd_api.R      # Data curation pipeline
 │   └── 02_validate_epd.R        # Quality validation
-├── reports/
-│   ├── epd_dashboard.Rmd        # Interactive dashboard source
-│   └── epd_dashboard.html       # Rendered dashboard
+├── docs/
+│   ├── curation_report.qmd      # Main curation documentation 
+│   └── curation_report.html     # Rendered curation documentation
 ├── data/
 │   ├── lookup/                  # Practice + BNF lookup tables
 │   └── clean/                   # Curated output (gitignored)
