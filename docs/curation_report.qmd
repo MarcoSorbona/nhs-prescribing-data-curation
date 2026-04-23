@@ -269,4 +269,4 @@ NHS Business Services Authority. "English Prescribing Dataset (EPD) with SNOMED 
 ## Accessible Dashboard
 
 An interactive version of this analysis is available at:\
-[epd_dashboard.html](C:/Users/Marco/Documents/Repos_Data_Science_with_R/nhs-prescribing-data-curation/epd_dashboard.html)
+[epd_dashboard](https://marcosorbona.github.io/nhs-prescribing-data-curation/epd_dashboard.html)[.html](C:/Users/Marco/Documents/Repos_Data_Science_with_R/nhs-prescribing-data-curation/epd_dashboard.html)
