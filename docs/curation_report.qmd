@@ -1,5 +1,274 @@
 ---
-title: "curation_report"
-format: html
+title: "English Prescribing Dataset (EPD) Curation Report"
+author: "Marco Sorbona"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 3
+    code_folding: show
 ---
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+library(arrow)
+library(dplyr)
+library(ggplot2)
+library(DT)
+library(tidyverse)
+```
+
+## Executive Summary
+
+This report documents the curation of the **English Prescribing Dataset (EPD) with SNOMED Code**, a monthly NHS dataset capturing all primary care prescriptions dispensed in England.
+
+**Data scale**: 7 GB per month, 17M+ rows monthly
+
+**Curation approach**: CKAN API with R data frame processing (sample: 10,000 rows per month)
+
+**Memory usage**: \< 2 GB
+
+```{r summary-stats, echo=FALSE}
+# Load curated data (use relative path)
+curated <- read_parquet("C:/Users/Marco/Documents/Repos_Data_Science_with_R/nhs-prescribing-data-curation/data/clean/epd_curated.parquet")
+
+# Generate summary stats dynamically
+total_rows <- nrow(curated)
+unique_months <- n_distinct(curated$year_month)
+min_month <- min(curated$year_month, na.rm = TRUE)
+max_month <- max(curated$year_month, na.rm = TRUE)
+total_items <- sum(curated$items, na.rm = TRUE)
+total_cost <- sum(curated$actual_cost, na.rm = TRUE)
+
+cat("**Sample processed**:", total_rows, "rows across", unique_months, "months (", min_month, "to", max_month, ")\n")
+```
+
+## Data Source & Attribution
+
+**Source**: NHS Business Services Authority. "English Prescribing Dataset (EPD) with SNOMED Code" NHSBSA Open Data. Accessed `r Sys.Date()`. URL: <https://opendata.nhsbsa.net/dataset/english-prescribing-dataset-epd-with-snomed-code>
+
+**Access Method**: CKAN API (`https://opendata.nhsbsa.net/api/3/action/datastore_search`)
+
+**Licence**: Open Government Licence v3.0
+
+**Copyright**: NHSBSA Copyright 2025
+
+## Key Data Quality Discoveries
+
+### 1. Missing Drug Names in API Data
+
+**Challenge**: The API endpoint for certain years returned zero `bnf_presentation_name` values.
+
+```{r missing-impact, echo=FALSE}
+# Dynamically detect which months/years have missing drug names
+months_with_missing <- curated |>
+  filter(is.na(bnf_presentation_name)) |>
+  distinct(year_month) |>
+  pull(year_month)
+
+# Extract unique years from affected months
+years_affected <- unique(substr(months_with_missing, 1, 4))
+
+if(length(months_with_missing) > 0) {
+  missing_data <- curated |>
+    filter(year_month %in% months_with_missing) |>
+    summarise(
+      rows = n(),
+      items = sum(items, na.rm = TRUE),
+      cost = sum(actual_cost, na.rm = TRUE)
+    )
+  
+  # Dynamic title based on affected years
+  if(length(years_affected) == 1) {
+    cat("**Affected year(s):** ", years_affected, "\n\n", sep = "")
+  } else {
+    cat("**Affected years:** ", paste(years_affected, collapse = ", "), "\n\n", sep = "")
+  }
+  
+  cat("- **", missing_data$rows, " rows** affected\n", sep = "")
+  cat("- **", format(missing_data$items, big.mark = ","), " items**\n", sep = "")
+  cat("- **£", format(round(missing_data$cost, 0), big.mark = ","), " in prescribing costs** cannot be attributed to specific drugs\n", sep = "")
+} else {
+  cat("**No missing drug names detected** in this sample.\n")
+}
+```
+
+**Challenge**: The API endpoint for certain years returned zero `bnf_presentation_name` values.
+
+**Solution**: Documented limitation; flagged affected rows with `corruption_flag`; recommend excluding affected months for drug-level analysis.
+
+```{r missing-table, echo=FALSE}
+missing_by_month <- curated |>
+  group_by(year_month) |>
+  summarise(
+    rows = n(),
+    items = sum(items, na.rm = TRUE),
+    cost = sum(actual_cost, na.rm = TRUE),
+    missing_drug_names = sum(is.na(bnf_presentation_name)),
+    pct_missing = 100 * missing_drug_names / rows
+  ) |>
+  mutate(
+    drug_names_present = case_when(
+      pct_missing == 100 ~ "❌ ALL missing",
+      pct_missing == 0 ~ "✅ ALL present",
+      TRUE ~ paste0(100 - pct_missing, "% present")
+    )
+  )
+
+knitr::kable(missing_by_month |> select(year_month, rows, items, cost, drug_names_present),
+  caption = "Missing Drug Names by Month")
+```
+
+### 2. Inconsistent Date Formats Across Years
+
+**Challenge**: API returned different date formats for different years (observed in the data).
+
+**Solution**: Standardised using `case_when()` before time series analysis.
+
+### 3. Serious Shortage Protocols (SSPs)
+
+**Challenge**: No flag for SSP claims; dispensed drug ≠ prescribed drug.
+
+**Limitation**: Cannot identify SSP-impacted prescriptions from EPD alone.
+
+**Mitigation**: Documented limitation in quality report and dashboard disclaimer.
+
+### 4. Negative Quantities (Returns)
+
+**Challenge**: Returns to pharmacy appear as negative quantities.
+
+**Decision**: Retain in dataset; documented.
+
+### 5. Missing Lookup Matches
+
+**Challenge**: Practice and BNF codes may not match lookup tables.
+
+**Action**: Left joins with reporting of match rates.
+
+## Quality Metrics
+
+```{r quality-metrics, echo=FALSE}
+# Load quality report if it exists
+if(file.exists("data/clean/quality_report.rds")) {
+  quality <- readRDS("data/clean/quality_report.rds")
+  
+  cat("### Summary Metrics\n")
+  cat("- **Total rows processed:** ", quality$total_rows_after_cleaning, "\n")
+  cat("- **Months processed:** ", paste(quality$months_processed, collapse = ", "), "\n")
+  cat("- **Date range:** ", quality$date_range$earliest, " to ", quality$date_range$latest, "\n")
+  cat("- **Total items:** ", format(quality$final_summary$total_items, big.mark = ","), "\n")
+  cat("- **Total cost:** £", format(round(quality$final_summary$total_cost, 0), big.mark = ","), "\n")
+  cat("- **Unique practices:** ", format(quality$final_summary$unique_practices, big.mark = ","), "\n")
+  cat("- **Unique drugs:** ", format(quality$final_summary$unique_drugs, big.mark = ","), "\n")
+  
+  if(!is.null(quality$data_quality_issues)) {
+    cat("\n### Data Quality Issues Identified\n")
+    cat("- **Missing drug names (2023):** ", quality$data_quality_issues$missing_drug_names$affected_rows, " rows affected\n")
+    cat("- **Inconsistent date formats:** 2023 vs 2025/2026\n")
+  }
+} else {
+  cat("Run `01_curate_epd_api.R` first to generate quality report.")
+}
+```
+
+## Key Variables
+
+| Variable | Type | Description |
+|------------------------|------------------|------------------------------|
+| `year_month` | character | Year and month (format varies by year) |
+| `practice_code` | character | NHS GP practice code (ODS code) |
+| `bnf_presentation_code` | character | 15-digit BNF drug code |
+| `bnf_presentation_name` | character | Drug name (⚠️ missing for years without data) |
+| `items` | numeric | Number of prescription items |
+| `actual_cost` | numeric | Reimbursement cost in GBP |
+| `regional_office_name` | character | NHS England region |
+| `corruption_flag` | character | Flags rows with known data issues |
+| `date` | Date | Standardised date for time series |
+
+## Dynamic Sample Observations
+
+```{r dynamic-insights, echo=FALSE}
+# Generate top drugs dynamically
+top_drugs <- curated |>
+  filter(!is.na(bnf_presentation_name)) |>
+  group_by(bnf_presentation_name) |>
+  summarise(total_cost = sum(actual_cost, na.rm = TRUE)) |>
+  arrange(desc(total_cost)) |>
+  head(5)
+
+cat("### Top 5 Drugs in This Sample\n")
+print(top_drugs)
+
+# Regional summary
+region_summary <- curated |>
+  group_by(regional_office_name) |>
+  summarise(total_cost = sum(actual_cost, na.rm = TRUE)) |>
+  arrange(desc(total_cost))
+
+cat("\n### Regional Cost Distribution\n")
+print(region_summary)
+```
+
+## Limitations (Official NHSBSA Caveats)
+
+1.  **PGD exclusions**: Pharmacy First, contraception, smoking cessation not captured
+2.  **Dental prescribing**: Excluded entirely
+3.  **Hospital site codes**: Excluded (only cost centre codes included)
+4.  **SSPs**: Cannot be identified from EPD alone
+5.  **Code versioning**: BNF/SNOMED codes may change over time
+
+## Project Limitations
+
+| Limitation | Impact | Mitigation |
+|---------------------------|------------------|---------------------------|
+| API limit (10k rows/month) | Findings based on sample | Clear disclaimers |
+| Missing drug names (some years) | Cannot analyse those months | Flagged in quality report |
+| Limited months | Restricted time series | Documented; pipeline scales |
+
+## Data Quality Issue: Missing Drug Names
+
+### Discovery
+
+The API endpoint for certain years returned zero drug names.
+
+### Impact Assessment
+
+-   Drug-level analysis not possible for affected months
+-   Regional and monthly totals remain valid
+
+### Proposed Resolution (Production Context)
+
+| Step | Action                                     |
+|------|--------------------------------------------|
+| 1    | Download full CSV files from NHSBSA portal |
+| 2    | Use CSV pipeline instead of API            |
+| 3    | Join with appropriate BNF lookup           |
+
+### Decision for This Portfolio
+
+Documented as a data quality discovery rather than resolved, to demonstrate issue identification skills.
+
+## Usage Notes
+
+To reproduce this curation:
+
+1.  **Clone** this repository
+2.  **Ensure lookup tables** are in `data/lookup/`
+3.  **Run** the curation pipeline: `Rscript R/01_curate_epd_api.R`
+4.  **Render** this report: `quarto render curation_report.qmd`
+5.  **Render** the dashboard: `rmarkdown::render("epd_dashboard.Rmd")`
+
+## References
+
+-   NHSBSA. English Prescribing Dataset Release Guidance.
+-   Open Government Licence v3.0.
+-   BNF Code Information - Current Year. NHSBSA Open Data Portal.
+
+## Data Source
+
+NHS Business Services Authority. "English Prescribing Dataset (EPD) with SNOMED Code" OGL v3.0. NHSBSA Copyright 2025.
+
+## Accessible Dashboard
+
+An interactive version of this analysis is available at:\
+[epd_dashboard.html](C:/Users/Marco/Documents/Repos_Data_Science_with_R/nhs-prescribing-data-curation/epd_dashboard.html)

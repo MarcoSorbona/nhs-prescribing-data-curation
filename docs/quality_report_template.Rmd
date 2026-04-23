@@ -1,5 +1,0 @@
----
-title: "quality_report_template"
-output: html_document
----
-

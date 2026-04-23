@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.8.25">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Marco Sorbona">
+<meta name="dcterms.date" content="2026-04-23">
+
+<title>English Prescribing Dataset (EPD) Curation Report</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="curation_report_files/libs/clipboard/clipboard.min.js"></script>
+<script src="curation_report_files/libs/quarto-html/quarto.js" type="module"></script>
+<script src="curation_report_files/libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="curation_report_files/libs/quarto-html/axe/axe-check.js" type="module"></script>
+<script src="curation_report_files/libs/quarto-html/popper.min.js"></script>
+<script src="curation_report_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="curation_report_files/libs/quarto-html/anchor.min.js"></script>
+<link href="curation_report_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="curation_report_files/libs/quarto-html/quarto-syntax-highlighting-7b89279ff1a6dce999919e0e67d4d9ec.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="curation_report_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="curation_report_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="curation_report_files/libs/bootstrap/bootstrap-9e3ffae467580fdb927a41352e75a2e0.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+
+
+</head>
+
+<body class="fullcontent quarto-light">
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">English Prescribing Dataset (EPD) Curation Report</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    <div>
+    <div class="quarto-title-meta-heading">Author</div>
+    <div class="quarto-title-meta-contents">
+             <p>Marco Sorbona </p>
+          </div>
+  </div>
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">April 23, 2026</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<section id="executive-summary" class="level2">
+<h2 class="anchored" data-anchor-id="executive-summary">Executive Summary</h2>
+<p>This report documents the curation of the <strong>English Prescribing Dataset (EPD) with SNOMED Code</strong>, a monthly NHS dataset capturing all primary care prescriptions dispensed in England.</p>
+<p><strong>Data scale</strong>: 7 GB per month, 17M+ rows monthly</p>
+<p><strong>Curation approach</strong>: CKAN API with R data frame processing (sample: 10,000 rows per month)</p>
+<p><strong>Memory usage</strong>: &lt; 2 GB</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>**Sample processed**: 40000 rows across 4 months ( 202311 to 2026-01 )</code></pre>
+</div>
+</div>
+</section>
+<section id="data-source-attribution" class="level2">
+<h2 class="anchored" data-anchor-id="data-source-attribution">Data Source &amp; Attribution</h2>
+<p><strong>Source</strong>: NHS Business Services Authority. “English Prescribing Dataset (EPD) with SNOMED Code” NHSBSA Open Data. Accessed 2026-04-23. URL: <a href="https://opendata.nhsbsa.net/dataset/english-prescribing-dataset-epd-with-snomed-code" class="uri">https://opendata.nhsbsa.net/dataset/english-prescribing-dataset-epd-with-snomed-code</a></p>
+<p><strong>Access Method</strong>: CKAN API (<code>https://opendata.nhsbsa.net/api/3/action/datastore_search</code>)</p>
+<p><strong>Licence</strong>: Open Government Licence v3.0</p>
+<p><strong>Copyright</strong>: NHSBSA Copyright 2025</p>
+</section>
+<section id="key-data-quality-discoveries" class="level2">
+<h2 class="anchored" data-anchor-id="key-data-quality-discoveries">Key Data Quality Discoveries</h2>
+<section id="missing-drug-names-in-api-data" class="level3">
+<h3 class="anchored" data-anchor-id="missing-drug-names-in-api-data">1. Missing Drug Names in API Data</h3>
+<p><strong>Challenge</strong>: The API endpoint for certain years returned zero <code>bnf_presentation_name</code> values.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>**Affected year(s):** 2023
+
+- **20000 rows** affected
+- **104,680 items**
+- **£930,237 in prescribing costs** cannot be attributed to specific drugs</code></pre>
+</div>
+</div>
+<p><strong>Challenge</strong>: The API endpoint for certain years returned zero <code>bnf_presentation_name</code> values.</p>
+<p><strong>Solution</strong>: Documented limitation; flagged affected rows with <code>corruption_flag</code>; recommend excluding affected months for drug-level analysis.</p>
+<div class="cell">
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<caption>Missing Drug Names by Month</caption>
+<thead>
+<tr class="header">
+<th style="text-align: left;">year_month</th>
+<th style="text-align: right;">rows</th>
+<th style="text-align: right;">items</th>
+<th style="text-align: right;">cost</th>
+<th style="text-align: left;">drug_names_present</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">202311</td>
+<td style="text-align: right;">10000</td>
+<td style="text-align: right;">51833</td>
+<td style="text-align: right;">471907.3</td>
+<td style="text-align: left;">❌ ALL missing</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">202312</td>
+<td style="text-align: right;">10000</td>
+<td style="text-align: right;">52847</td>
+<td style="text-align: right;">458329.7</td>
+<td style="text-align: left;">❌ ALL missing</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">2025-12</td>
+<td style="text-align: right;">10000</td>
+<td style="text-align: right;">61667</td>
+<td style="text-align: right;">515187.0</td>
+<td style="text-align: left;">✅ ALL present</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">2026-01</td>
+<td style="text-align: right;">10000</td>
+<td style="text-align: right;">50931</td>
+<td style="text-align: right;">507463.3</td>
+<td style="text-align: left;">✅ ALL present</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+<section id="inconsistent-date-formats-across-years" class="level3">
+<h3 class="anchored" data-anchor-id="inconsistent-date-formats-across-years">2. Inconsistent Date Formats Across Years</h3>
+<p><strong>Challenge</strong>: API returned different date formats for different years (observed in the data).</p>
+<p><strong>Solution</strong>: Standardised using <code>case_when()</code> before time series analysis.</p>
+</section>
+<section id="serious-shortage-protocols-ssps" class="level3">
+<h3 class="anchored" data-anchor-id="serious-shortage-protocols-ssps">3. Serious Shortage Protocols (SSPs)</h3>
+<p><strong>Challenge</strong>: No flag for SSP claims; dispensed drug ≠ prescribed drug.</p>
+<p><strong>Limitation</strong>: Cannot identify SSP-impacted prescriptions from EPD alone.</p>
+<p><strong>Mitigation</strong>: Documented limitation in quality report and dashboard disclaimer.</p>
+</section>
+<section id="negative-quantities-returns" class="level3">
+<h3 class="anchored" data-anchor-id="negative-quantities-returns">4. Negative Quantities (Returns)</h3>
+<p><strong>Challenge</strong>: Returns to pharmacy appear as negative quantities.</p>
+<p><strong>Decision</strong>: Retain in dataset; documented.</p>
+</section>
+<section id="missing-lookup-matches" class="level3">
+<h3 class="anchored" data-anchor-id="missing-lookup-matches">5. Missing Lookup Matches</h3>
+<p><strong>Challenge</strong>: Practice and BNF codes may not match lookup tables.</p>
+<p><strong>Action</strong>: Left joins with reporting of match rates.</p>
+</section>
+</section>
+<section id="quality-metrics" class="level2">
+<h2 class="anchored" data-anchor-id="quality-metrics">Quality Metrics</h2>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>Run `01_curate_epd_api.R` first to generate quality report.</code></pre>
+</div>
+</div>
+</section>
+<section id="key-variables" class="level2">
+<h2 class="anchored" data-anchor-id="key-variables">Key Variables</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 25%">
+<col style="width: 41%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Variable</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>year_month</code></td>
+<td>character</td>
+<td>Year and month (format varies by year)</td>
+</tr>
+<tr class="even">
+<td><code>practice_code</code></td>
+<td>character</td>
+<td>NHS GP practice code (ODS code)</td>
+</tr>
+<tr class="odd">
+<td><code>bnf_presentation_code</code></td>
+<td>character</td>
+<td>15-digit BNF drug code</td>
+</tr>
+<tr class="even">
+<td><code>bnf_presentation_name</code></td>
+<td>character</td>
+<td>Drug name (⚠️ missing for years without data)</td>
+</tr>
+<tr class="odd">
+<td><code>items</code></td>
+<td>numeric</td>
+<td>Number of prescription items</td>
+</tr>
+<tr class="even">
+<td><code>actual_cost</code></td>
+<td>numeric</td>
+<td>Reimbursement cost in GBP</td>
+</tr>
+<tr class="odd">
+<td><code>regional_office_name</code></td>
+<td>character</td>
+<td>NHS England region</td>
+</tr>
+<tr class="even">
+<td><code>corruption_flag</code></td>
+<td>character</td>
+<td>Flags rows with known data issues</td>
+</tr>
+<tr class="odd">
+<td><code>date</code></td>
+<td>Date</td>
+<td>Standardised date for time series</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="dynamic-sample-observations" class="level2">
+<h2 class="anchored" data-anchor-id="dynamic-sample-observations">Dynamic Sample Observations</h2>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>### Top 5 Drugs in This Sample</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 5 × 2
+  bnf_presentation_name                                  total_cost
+  &lt;chr&gt;                                                       &lt;dbl&gt;
+1 FreeStyle Libre 2 Plus Sensor                              32224.
+2 Mounjaro KwikPen 10mg/0.6ml inj 2.4ml pre-filled pens      25246.
+3 Mounjaro KwikPen 7.5mg/0.6ml inj 2.4ml pre-filled pens     22441.
+4 Mounjaro KwikPen 5mg/0.6ml inj 2.4ml pre-filled pens       15841.
+5 Empagliflozin 10mg tablets                                 13699.</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+### Regional Cost Distribution</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 8 × 2
+  regional_office_name     total_cost
+  &lt;chr&gt;                         &lt;dbl&gt;
+1 MIDLANDS                    751182.
+2 SOUTH WEST                  365545.
+3 EAST OF ENGLAND             234289.
+4 NORTH WEST                  201566.
+5 NORTH EAST AND YORKSHIRE    197494.
+6 SOUTH EAST                  151585.
+7 LONDON                       47886.
+8 UNIDENTIFIED                  3340.</code></pre>
+</div>
+</div>
+</section>
+<section id="limitations-official-nhsbsa-caveats" class="level2">
+<h2 class="anchored" data-anchor-id="limitations-official-nhsbsa-caveats">Limitations (Official NHSBSA Caveats)</h2>
+<ol type="1">
+<li><strong>PGD exclusions</strong>: Pharmacy First, contraception, smoking cessation not captured</li>
+<li><strong>Dental prescribing</strong>: Excluded entirely</li>
+<li><strong>Hospital site codes</strong>: Excluded (only cost centre codes included)</li>
+<li><strong>SSPs</strong>: Cannot be identified from EPD alone</li>
+<li><strong>Code versioning</strong>: BNF/SNOMED codes may change over time</li>
+</ol>
+</section>
+<section id="project-limitations" class="level2">
+<h2 class="anchored" data-anchor-id="project-limitations">Project Limitations</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 37%">
+<col style="width: 25%">
+<col style="width: 37%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Limitation</th>
+<th>Impact</th>
+<th>Mitigation</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>API limit (10k rows/month)</td>
+<td>Findings based on sample</td>
+<td>Clear disclaimers</td>
+</tr>
+<tr class="even">
+<td>Missing drug names (some years)</td>
+<td>Cannot analyse those months</td>
+<td>Flagged in quality report</td>
+</tr>
+<tr class="odd">
+<td>Limited months</td>
+<td>Restricted time series</td>
+<td>Documented; pipeline scales</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="data-quality-issue-missing-drug-names" class="level2">
+<h2 class="anchored" data-anchor-id="data-quality-issue-missing-drug-names">Data Quality Issue: Missing Drug Names</h2>
+<section id="discovery" class="level3">
+<h3 class="anchored" data-anchor-id="discovery">Discovery</h3>
+<p>The API endpoint for certain years returned zero drug names.</p>
+</section>
+<section id="impact-assessment" class="level3">
+<h3 class="anchored" data-anchor-id="impact-assessment">Impact Assessment</h3>
+<ul>
+<li>Drug-level analysis not possible for affected months</li>
+<li>Regional and monthly totals remain valid</li>
+</ul>
+</section>
+<section id="proposed-resolution-production-context" class="level3">
+<h3 class="anchored" data-anchor-id="proposed-resolution-production-context">Proposed Resolution (Production Context)</h3>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Step</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1</td>
+<td>Download full CSV files from NHSBSA portal</td>
+</tr>
+<tr class="even">
+<td>2</td>
+<td>Use CSV pipeline instead of API</td>
+</tr>
+<tr class="odd">
+<td>3</td>
+<td>Join with appropriate BNF lookup</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="decision-for-this-portfolio" class="level3">
+<h3 class="anchored" data-anchor-id="decision-for-this-portfolio">Decision for This Portfolio</h3>
+<p>Documented as a data quality discovery rather than resolved, to demonstrate issue identification skills.</p>
+</section>
+</section>
+<section id="usage-notes" class="level2">
+<h2 class="anchored" data-anchor-id="usage-notes">Usage Notes</h2>
+<p>To reproduce this curation:</p>
+<ol type="1">
+<li><strong>Clone</strong> this repository</li>
+<li><strong>Ensure lookup tables</strong> are in <code>data/lookup/</code></li>
+<li><strong>Run</strong> the curation pipeline: <code>Rscript R/01_curate_epd_api.R</code></li>
+<li><strong>Render</strong> this report: <code>quarto render curation_report.qmd</code></li>
+<li><strong>Render</strong> the dashboard: <code>rmarkdown::render("epd_dashboard.Rmd")</code></li>
+</ol>
+</section>
+<section id="references" class="level2">
+<h2 class="anchored" data-anchor-id="references">References</h2>
+<ul>
+<li>NHSBSA. English Prescribing Dataset Release Guidance.</li>
+<li>Open Government Licence v3.0.</li>
+<li>BNF Code Information - Current Year. NHSBSA Open Data Portal.</li>
+</ul>
+</section>
+<section id="data-source" class="level2">
+<h2 class="anchored" data-anchor-id="data-source">Data Source</h2>
+<p>NHS Business Services Authority. “English Prescribing Dataset (EPD) with SNOMED Code” OGL v3.0. NHSBSA Copyright 2025.</p>
+</section>
+<section id="accessible-dashboard" class="level2">
+<h2 class="anchored" data-anchor-id="accessible-dashboard">Accessible Dashboard</h2>
+<p>An interactive version of this analysis is available at:<br>
+<a href="C:/Users/Marco/Documents/Repos_Data_Science_with_R/nhs-prescribing-data-curation/epd_dashboard.html">epd_dashboard.html</a></p>
+</section>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

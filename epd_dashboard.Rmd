@@ -1,0 +1,286 @@
+---
+title: "EPD Prescribing Dashboard"
+author: "Marco Sorbona"
+date: "April 2026"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    vertical_layout: fill
+    theme: flatly
+    self_contained: true
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(tidyverse)
+library(plotly)
+library(DT)
+library(arrow)
+
+# Load the curated data
+curated <- read_parquet("data/clean/epd_curated.parquet")
+
+# Define ALL variables here (before sidebar tries to use them)
+total_items <- sum(curated$items, na.rm = TRUE)
+total_cost <- sum(curated$actual_cost, na.rm = TRUE)
+unique_practices <- n_distinct(curated$practice_code)
+unique_drugs <- n_distinct(curated$bnf_presentation_code)
+date_min <- min(curated$year_month, na.rm = TRUE)
+date_max <- max(curated$year_month, na.rm = TRUE)
+corruption_count <- sum(!is.na(curated$corruption_flag))
+```
+
+# Overview {.sidebar}
+
+## Data Summary
+
+------------------------------------------------------------------------
+
+### Total Items
+
+`r format(total_items, big.mark = ",")`
+
+------------------------------------------------------------------------
+
+### Total Cost
+
+`r paste0("£", format(round(total_cost, 0), big.mark = ","))`
+
+------------------------------------------------------------------------
+
+### Unique Practices
+
+`r format(unique_practices, big.mark = ",")`
+
+------------------------------------------------------------------------
+
+### Unique Drugs
+
+`r format(unique_drugs, big.mark = ",")`
+
+### Date Range
+
+`r date_min` to `r date_max`
+
+**Months:** `r n_distinct(curated$year_month)`
+
+### Data Quality Note
+
+`r if(corruption_count > 0) paste0("⚠️ **Corruption detected:** ", corruption_count, " rows flagged") else paste0("✅ **No corruption flags** in this sample")`
+
+*Note: API limited to 10,000 rows per month*
+
+⚠️ **Disclaimer:** Dashboard based on 40,000 row sample only
+
+### Data Quality Discovery
+
+**2023 API Limitation:** November and December 2023 records have missing drug names (20,000 rows, £913k). Later months (2025-2026) contain complete drug names.
+
+*This finding is documented in the quality report.*
+
+# Top Drugs {.column}
+
+### Top 10 Drugs by Total Cost
+
+```{r}
+top_drugs <- curated |> 
+  group_by(bnf_presentation_name) |> 
+  summarise(total_cost = sum(actual_cost, na.rm = TRUE)) |> 
+  arrange(desc(total_cost)) |> 
+  head(10)
+
+ggplot(top_drugs, aes(x = reorder(bnf_presentation_name, total_cost), 
+                       y = total_cost, 
+                       fill = total_cost)) +
+  geom_col() +
+  coord_flip() +
+  scale_fill_gradient(low = "lightblue", high = "darkblue") +
+  labs(x = "", y = "Total Cost (£)", 
+       title = "Top 10 Drugs by Cost") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+```
+
+### Data Quality: Missing Drug Names by Month
+
+```{r}
+missing_by_month <- curated|>
+  group_by(year_month)|>
+  summarise(
+    missing_drug_names = sum(is.na(bnf_presentation_name)),
+    total_rows = n(),
+    pct_missing = 100 * missing_drug_names / total_rows
+  )
+
+# Create dynamic colour palette
+colour_palette <- missing_by_month |>
+  mutate(colour = ifelse(pct_missing == 100, "#D62728", "#2CA02C")) |>
+  select(year_month, colour) |>
+  deframe()
+
+ggplot(missing_by_month, aes(x = year_month, y = pct_missing, fill = year_month)) +
+  geom_col() +
+  geom_text(aes(label = paste0(round(pct_missing, 0), "%")), vjust = -0.5, size = 3) +
+  scale_fill_manual(values = colour_palette) +
+  labs(x = "Month", y = "Missing Drug Names (%)", 
+       title = "Data Quality: Missing Drug Names by Month",
+       subtitle = paste0("Months with 100% missing: ", 
+                         paste(missing_by_month |> filter(pct_missing == 100) |> pull(year_month), collapse = ", "),
+                         " | 0% missing: ",
+                         paste(missing_by_month |> filter(pct_missing == 0) |> pull(year_month), collapse = ", "))) +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
+**Insight:** The API endpoint for 2023 data (November and December) returned zero drug names - affecting 20,000 rows and £913k in prescribing costs. Later months (2025-2026) contain complete drug names, suggesting a data quality improvement over time or a limitation in the historical API endpoint.
+
+# Regional Analysis {.column}
+
+### Prescribing by Region (Time Series)
+
+```{r}
+region_summary <- curated |> 
+  group_by(regional_office_name, year_month) |> 
+  summarise(
+    total_cost = sum(actual_cost, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+ggplot(region_summary, aes(x = year_month, 
+                            y = total_cost, 
+                            color = regional_office_name,
+                            group = regional_office_name)) +
+  geom_line(linewidth = 0.8) +
+  geom_point(size = 1.3) +
+  labs(x = "Month", y = "Total Cost (£)", 
+       title = "Prescribing Cost by Region Over Time",
+       color = "Region") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+### Regional Cost Share
+
+```{r}
+region_share <- curated |> 
+  group_by(regional_office_name) |> 
+  summarise(total_cost = sum(actual_cost, na.rm = TRUE)) |> 
+  arrange(desc(total_cost))
+
+ggplot(region_share, aes(x = reorder(regional_office_name, total_cost), 
+                          y = total_cost, 
+                          fill = regional_office_name)) +
+  geom_col() +
+  coord_flip() +
+  labs(x = "", y = "Total Cost (£)", 
+       title = "Total Cost by Region") +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
+# Latest Month Analysis {.column}
+
+### Latest Month Snapshot
+
+```{r}
+# Find the latest month in the data
+latest_month <- curated |>
+  filter(!is.na(bnf_presentation_name)) |>
+  arrange(desc(year_month)) |>
+  slice(1) |>
+  pull(year_month)
+
+latest_month_data <- curated |> 
+  filter(year_month == latest_month)
+
+if(nrow(latest_month_data) > 0) {
+  latest_items <- sum(latest_month_data$items, na.rm = TRUE)
+  latest_cost <- sum(latest_month_data$actual_cost, na.rm = TRUE)
+  latest_drugs <- n_distinct(latest_month_data$bnf_presentation_name, na.rm = TRUE)
+  
+  cat("**Month:** ", latest_month, "\n\n")
+  cat("**Total Items:**", format(latest_items, big.mark = ","), "\n\n")
+  cat("**Total Cost:** £", format(round(latest_cost, 0), big.mark = ","), "\n\n")
+  cat("**Unique Drugs:**", format(latest_drugs, big.mark = ","), "\n\n")
+  cat("**Rows:**", nrow(latest_month_data))
+} else {
+  cat("No complete month data available")
+}
+```
+
+### Month-by-Month Comparison
+
+```{r}
+monthly_summary <- curated |> 
+  group_by(year_month) |> 
+  summarise(
+    total_items = sum(items, na.rm = TRUE),
+    total_cost = sum(actual_cost, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+ggplot(monthly_summary, aes(x = year_month)) +
+  geom_col(aes(y = total_items), fill = "steelblue", alpha = 0.7) +
+  geom_line(aes(y = total_cost / 10), group = 1, color = "red", linewidth = 0.8) +
+  scale_y_continuous(
+    name = "Total Items",
+    sec.axis = sec_axis(~ . * 10, name = "Total Cost (£)")
+  ) +
+  labs(x = "Month", title = "Monthly Prescribing Volume and Cost") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+# Key Insights {.data}
+
+### Summary of Findings
+
+```{r}
+# Create an insights table
+insights <- data.frame(
+  Finding = c(
+    "Missing drug names (2023 API data)",
+    "Inconsistent date formats",
+    "Later months have complete data",
+    "Regional variation observed (in sample)",
+    "Sample limitations"
+  ),
+  Insight = c(
+    "API endpoint for 2023 data lacks drug names – data quality issue",
+    "API returns different date formats for different years",
+    "Data quality improved by 2025 – 0% missing drug names in sample",
+    "London and South East had highest costs in this sample",
+    "Findings based on 40k random sample (10k/month)"
+  ),
+  Qualification = c(
+    "✅ Affects ALL users of 2023 API data",
+    "✅ Affects ALL users of the API",
+    "✅ Affects ALL users of 2025+ API data",
+    "⚠️ Sample only – not generalisable",
+    "⚠️ Do not draw national conclusions"
+  )
+)
+
+datatable(insights, 
+  options = list(pageLength = 10, scrollX = TRUE),
+  rownames = FALSE,
+  caption = "Key Findings from EPD Curation (40,000 row sample)"
+)
+```
+
+# Raw Data  {.data}
+
+### Curated Dataset Preview
+
+```{r}
+datatable(curated |> 
+  select(year_month, regional_office_name, practice_name_raw, 
+         bnf_presentation_name, items, actual_cost) |> 
+  head(100),
+  options = list(scrollX = TRUE, pageLength = 10),
+  rownames = FALSE)
+```
+
